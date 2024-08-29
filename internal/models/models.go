@@ -1,8 +1,6 @@
 package models
 
 import (
-	"fmt"
-
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
@@ -18,6 +16,7 @@ type Permission struct {
 	gorm.Model
 	Name        string `gorm:"unique;not null"`
 	Description string
+	Code        string `gorm:"unique;not null"`
 }
 
 type User struct {
@@ -43,26 +42,4 @@ func (u *User) SetPassword(password string) error {
 func (u *User) CheckPassword(password string) bool {
 	err := bcrypt.CompareHashAndPassword([]byte(u.Password), []byte(password))
 	return err == nil
-}
-
-// AddRole 為用戶添加角色
-func (u *User) AddRole(db *gorm.DB, role *Role) error {
-	return db.Model(u).Association("Roles").Append(role)
-}
-
-// RemoveRole 從用戶中移除角色
-func (u *User) RemoveRole(db *gorm.DB, role *Role) error {
-	return db.Model(u).Association("Roles").Delete(role)
-}
-
-// HasRole 檢查用戶是否擁有特定角色
-func (u *User) HasRole(roleName string) bool {
-	for _, role := range u.Roles {
-		if role.Name == roleName {
-			fmt.Printf("111111")
-			return true
-		}
-	}
-	fmt.Printf("00000")
-	return false
 }

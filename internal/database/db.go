@@ -38,12 +38,10 @@ func InitDB() {
 	DB, dbErr = gorm.Open(postgres.Open(dsn), &gorm.Config{
 		PrepareStmt: false, // 禁用預處理語句緩存
 	})
-	
+
 	if dbErr != nil {
 		log.Fatalf("無法連接到數據庫：%v", dbErr)
 	}
-
-
 
 	log.Println("數據庫初始化成功")
 }

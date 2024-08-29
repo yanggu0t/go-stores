@@ -8,12 +8,12 @@ import (
 )
 
 func main() {
-    // Initialize database
-    database.InitDB()
+	// Initialize database
+	database.InitDB()
 
-    // Set up router
-    r := router.SetupRouter()
+	// Set up router
+	r := router.SetupRouter()
 
-    // Start server
-    log.Fatal(r.Run(":8080"))
+	// Start server
+	log.Fatal(r.Run(":8080"))
 }
