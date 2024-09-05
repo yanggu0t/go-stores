@@ -5,17 +5,20 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/yanggu0t/go-rdbms-practice/config"
 	"github.com/yanggu0t/go-rdbms-practice/internal/models"
+	"github.com/yanggu0t/go-rdbms-practice/internal/services"
 	"github.com/yanggu0t/go-rdbms-practice/internal/utils"
 	"gorm.io/gorm"
 )
 
 type Handler struct {
-	DB *gorm.DB
+	DB  *gorm.DB
+	Cfg *config.Config
 }
 
-func NewHandler(db *gorm.DB) *Handler {
-	return &Handler{DB: db}
+func NewHandler(db *gorm.DB, cfg *config.Config) *Handler {
+	return &Handler{DB: db, Cfg: cfg}
 }
 
 // ================== Search ==================
@@ -38,10 +41,11 @@ func (h *Handler) GetAllUsersHandler(c *gin.Context) {
 	response := make([]gin.H, len(users))
 	for i, user := range users {
 		response[i] = gin.H{
-			"id":       user.ID,
+			"index":    user.ID,
 			"username": user.Username,
 			"email":    user.Email,
 			"roles":    user.Roles,
+			"userId":   user.UserID,
 		}
 	}
 
@@ -69,7 +73,7 @@ func (h *Handler) GetAllRolesHandler(c *gin.Context) {
 	response := make([]gin.H, len(roles))
 	for i, role := range roles {
 		response[i] = gin.H{
-			"id":          role.ID,
+			"index":       role.ID,
 			"name":        role.Name,
 			"description": role.Description,
 			"permissions": role.Permissions,
@@ -395,4 +399,26 @@ func (h *Handler) UpdatePermissionHandler(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, response)
+}
+
+type LoginRequest struct {
+	Username string `json:"username" binding:"required"`
+	Password string `json:"password" binding:"required"`
+}
+
+func (h *Handler) LoginHandler(c *gin.Context) {
+	var req LoginRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	authService := services.NewAuthService(h.DB, h.Cfg.JWTSecret)
+	token, err := authService.Login(req.Username, req.Password)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"token": token})
 }

@@ -5,37 +5,41 @@ import (
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
-	"github.com/yanggu0t/go-rdbms-practice/internal/database"
+	"github.com/yanggu0t/go-rdbms-practice/config"
 	"github.com/yanggu0t/go-rdbms-practice/internal/handlers"
 	"github.com/yanggu0t/go-rdbms-practice/internal/middleware"
 	"github.com/yanggu0t/go-rdbms-practice/internal/services"
+	"gorm.io/gorm"
 )
 
-func SetupRouter() *gin.Engine {
+func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	r := gin.Default()
 
 	// 配置 CORS
-	config := cors.Config{
+	corsConfig := cors.Config{
 		AllowOrigins:     []string{"*"}, // 允許的前端域名
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE"},
-		AllowHeaders:     []string{"Origin", "Content-Length", "Content-Type", "Authorization", "X-User-ID"},
+		AllowHeaders:     []string{"Origin", "Content-Length", "Content-Type", "Authorization"},
 		ExposeHeaders:    []string{"Content-Length"},
 		AllowCredentials: true,
 		MaxAge:           12 * time.Hour,
 	}
-	r.Use(cors.New(config))
+	r.Use(cors.New(corsConfig))
 
-	// 创建 UserService 实例
-	userService := services.NewUserService(database.DB)
+	// 創建服務實例
+	authService := services.NewAuthService(db, cfg.JWTSecret)
+	handler := handlers.NewHandler(db, cfg)
 
-	handler := handlers.NewHandler(database.DB)
+	// 設置不需要特殊權限的路由
+	r.POST("/login", handler.LoginHandler)
 
-	// 添加身份驗證中間件，传入 UserService
-	r.Use(middleware.AuthMiddleware(userService))
+	// 使用 AuthMiddleware
+	authorized := r.Group("/")
+	authorized.Use(middleware.AuthMiddleware(authService))
 
-	// 創建一個需要管理員權限的路由組
-	admin := r.Group("/")
-	admin.Use(middleware.RoleMiddleware(userService, "admin"))
+	// 設置需要管理員權限的路由
+	admin := authorized.Group("/admin")
+	admin.Use(middleware.AuthMiddleware(authService, "admin"))
 
 	// 設置需要管理員權限的路由
 	admin.GET("/users", handler.GetAllUsersHandler)
@@ -47,8 +51,6 @@ func SetupRouter() *gin.Engine {
 	admin.PUT("/roles/:id", handler.UpdateRoleHandler)
 	admin.PUT("/users/:id", handler.UpdateUserHandler)
 	admin.PUT("/permissions/:id", handler.UpdatePermissionHandler)
-
-	// 設置不需要特殊權限的路由
 
 	return r
 }
