@@ -34,7 +34,7 @@ func (h *Handler) GetAllUsersHandler(c *gin.Context) {
 
 	var users []models.User
 	if err := db.Preload("Roles").Offset((page - 1) * pageSize).Limit(pageSize).Find(&users).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "獲取用戶列表時出錯: " + err.Error()})
+		utils.Response(c, http.StatusInternalServerError, "error", "獲取用戶列表時出錯: "+err.Error(), nil)
 		return
 	}
 
@@ -49,7 +49,7 @@ func (h *Handler) GetAllUsersHandler(c *gin.Context) {
 		}
 	}
 
-	c.JSON(http.StatusOK, gin.H{
+	utils.Response(c, http.StatusOK, "success", "", gin.H{
 		"users":      response,
 		"pagination": utils.GetPaginationResponse(page, pageSize, total),
 	})
@@ -66,7 +66,7 @@ func (h *Handler) GetAllRolesHandler(c *gin.Context) {
 
 	var roles []models.Role
 	if err := db.Offset((page - 1) * pageSize).Limit(pageSize).Find(&roles).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "獲取角色列表時出錯: " + err.Error()})
+		utils.Response(c, http.StatusInternalServerError, "error", "獲取角色列表時出錯: "+err.Error(), nil)
 		return
 	}
 
@@ -80,7 +80,7 @@ func (h *Handler) GetAllRolesHandler(c *gin.Context) {
 		}
 	}
 
-	c.JSON(http.StatusOK, gin.H{
+	utils.Response(c, http.StatusOK, "success", "", gin.H{
 		"roles":      response,
 		"pagination": utils.GetPaginationResponse(page, pageSize, total),
 	})
@@ -104,11 +104,11 @@ func (h *Handler) GetAllPermissionsHandler(c *gin.Context) {
 	if err := db.Select("id", "name", "description", "code").
 		Offset((page - 1) * pageSize).Limit(pageSize).
 		Find(&permissions).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "獲取權限列表時出錯: " + err.Error()})
+		utils.Response(c, http.StatusInternalServerError, "error", "獲取權限列表時出錯: "+err.Error(), nil)
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
+	utils.Response(c, http.StatusOK, "success", "", gin.H{
 		"permissions": permissions,
 		"pagination":  utils.GetPaginationResponse(page, pageSize, total),
 	})
@@ -119,39 +119,39 @@ func (h *Handler) GetAllPermissionsHandler(c *gin.Context) {
 func (h *Handler) CreateRoleHandler(c *gin.Context) {
 	var role models.Role
 	if err := c.ShouldBindJSON(&role); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		utils.Response(c, http.StatusBadRequest, "error", err.Error(), nil)
 		return
 	}
 
 	// 使用 GORM 創建角色
 	if err := h.DB.Create(&role).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		utils.Response(c, http.StatusInternalServerError, "error", err.Error(), nil)
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{"message": "Role created successfully", "role": role})
+	utils.Response(c, http.StatusCreated, "success", "Role created successfully", role)
 }
 
 func (h *Handler) CreatePermissionHandler(c *gin.Context) {
 	var permission models.Permission
 	if err := c.ShouldBindJSON(&permission); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		utils.Response(c, http.StatusBadRequest, "error", err.Error(), nil)
 		return
 	}
 
 	// 使用 GORM 創建權限
 	if err := h.DB.Create(&permission).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		utils.Response(c, http.StatusInternalServerError, "error", err.Error(), nil)
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{"message": "Permission created successfully", "permission": permission})
+	utils.Response(c, http.StatusCreated, "success", "Permission created successfully", permission)
 }
 
 func (h *Handler) CreateUserHandler(c *gin.Context) {
 	var user models.User
 	if err := c.ShouldBindJSON(&user); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		utils.Response(c, http.StatusBadRequest, "error", err.Error(), nil)
 		return
 	}
 
@@ -160,20 +160,20 @@ func (h *Handler) CreateUserHandler(c *gin.Context) {
 
 	// 加密密碼
 	if err := user.SetPassword(user.Password); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "無法加密密碼"})
+		utils.Response(c, http.StatusInternalServerError, "error", "無法加密密碼", nil)
 		return
 	}
 
 	// 使用 GORM 創建用戶
 	if err := h.DB.Create(&user).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		utils.Response(c, http.StatusInternalServerError, "error", err.Error(), nil)
 		return
 	}
 
 	// 清除返回的密碼字段
 	user.Password = ""
 
-	c.JSON(http.StatusCreated, gin.H{"message": "用戶創建成功", "user": user})
+	utils.Response(c, http.StatusCreated, "success", "用戶創建成功", user)
 }
 
 // ================== Update ==================
@@ -189,13 +189,13 @@ func (h *Handler) UpdateRoleHandler(c *gin.Context) {
 	roleID := c.Param("id")
 	var req UpdateRoleRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "無效的請求體: " + err.Error()})
+		utils.Response(c, http.StatusBadRequest, "error", "無效的請求體: "+err.Error(), nil)
 		return
 	}
 
 	var existingRole models.Role
 	if err := h.DB.Preload("Permissions").First(&existingRole, roleID).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "角色未找到"})
+		utils.Response(c, http.StatusNotFound, "error", "角色未找到", nil)
 		return
 	}
 
@@ -209,14 +209,14 @@ func (h *Handler) UpdateRoleHandler(c *gin.Context) {
 	// 更新角色基本信息
 	if err := tx.Save(&existingRole).Error; err != nil {
 		tx.Rollback()
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "更新角色時出錯: " + err.Error()})
+		utils.Response(c, http.StatusInternalServerError, "error", "更新角色時出錯: "+err.Error(), nil)
 		return
 	}
 
 	// 清除現有權限
 	if err := tx.Model(&existingRole).Association("Permissions").Clear(); err != nil {
 		tx.Rollback()
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "清除權限時出錯: " + err.Error()})
+		utils.Response(c, http.StatusInternalServerError, "error", "清除權限時出錯: "+err.Error(), nil)
 		return
 	}
 
@@ -225,26 +225,26 @@ func (h *Handler) UpdateRoleHandler(c *gin.Context) {
 		var newPermissions []models.Permission
 		if err := tx.Where("id IN ?", req.Permissions).Find(&newPermissions).Error; err != nil {
 			tx.Rollback()
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "獲取權限時出錯: " + err.Error()})
+			utils.Response(c, http.StatusInternalServerError, "error", "獲取權限時出錯: "+err.Error(), nil)
 			return
 		}
 
 		if err := tx.Model(&existingRole).Association("Permissions").Append(&newPermissions); err != nil {
 			tx.Rollback()
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "添加權限時出錯: " + err.Error()})
+			utils.Response(c, http.StatusInternalServerError, "error", "添加權限時出錯: "+err.Error(), nil)
 			return
 		}
 	}
 
 	// 提交事務
 	if err := tx.Commit().Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "提交更改時出錯: " + err.Error()})
+		utils.Response(c, http.StatusInternalServerError, "error", "提交更改時出錯: "+err.Error(), nil)
 		return
 	}
 
 	// 重新加載角色以獲取更新後的權限
 	if err := h.DB.Preload("Permissions").First(&existingRole, roleID).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "獲取更新後的角色信息時出錯: " + err.Error()})
+		utils.Response(c, http.StatusInternalServerError, "error", "獲取更新後的角色信息時出錯: "+err.Error(), nil)
 		return
 	}
 
@@ -274,20 +274,20 @@ func (h *Handler) UpdateRoleHandler(c *gin.Context) {
 		},
 	}
 
-	c.JSON(http.StatusOK, response)
+	utils.Response(c, http.StatusOK, "success", "角色更新成功", response)
 }
 
 func (h *Handler) UpdateUserHandler(c *gin.Context) {
 	userID := c.Param("id")
 	var updatedUser models.User
 	if err := c.ShouldBindJSON(&updatedUser); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "無效的請求體: " + err.Error()})
+		utils.Response(c, http.StatusBadRequest, "error", "無效的請求體: "+err.Error(), nil)
 		return
 	}
 
 	var existingUser models.User
 	if err := h.DB.First(&existingUser, "user_id = ?", userID).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "用戶未找到"})
+		utils.Response(c, http.StatusNotFound, "error", "用戶未找到", nil)
 		return
 	}
 
@@ -296,18 +296,18 @@ func (h *Handler) UpdateUserHandler(c *gin.Context) {
 
 	if updatedUser.Password != "" {
 		if err := existingUser.SetPassword(updatedUser.Password); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "無法加密密碼"})
+			utils.Response(c, http.StatusInternalServerError, "error", "無法加密密碼", nil)
 			return
 		}
 	}
 
 	if err := h.DB.Save(&existingUser).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "更新用戶時出錯: " + err.Error()})
+		utils.Response(c, http.StatusInternalServerError, "error", "更新用戶時出錯: "+err.Error(), nil)
 		return
 	}
 
 	existingUser.Password = "" // 清除返回的密碼字段
-	c.JSON(http.StatusOK, gin.H{"message": "用戶更新成功", "user": existingUser})
+	utils.Response(c, http.StatusOK, "success", "用戶更新成功", existingUser)
 }
 
 type UpdatePermissionRequest struct {
@@ -320,16 +320,16 @@ func (h *Handler) UpdatePermissionHandler(c *gin.Context) {
 	permissionID := c.Param("id")
 	var req UpdatePermissionRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "無效的請求體: " + err.Error()})
+		utils.Response(c, http.StatusBadRequest, "error", "無效的請求體: "+err.Error(), nil)
 		return
 	}
 
 	var existingPermission models.Permission
 	if err := h.DB.First(&existingPermission, permissionID).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			c.JSON(http.StatusNotFound, gin.H{"error": "權限未找到"})
+			utils.Response(c, http.StatusNotFound, "error", "權限未找到", nil)
 		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "獲取權限時出錯: " + err.Error()})
+			utils.Response(c, http.StatusInternalServerError, "error", "獲取權限時出錯: "+err.Error(), nil)
 		}
 		return
 	}
@@ -340,11 +340,11 @@ func (h *Handler) UpdatePermissionHandler(c *gin.Context) {
 		if err := h.DB.Model(&models.Permission{}).
 			Where("name = ? AND id != ?", req.Name, existingPermission.ID).
 			Count(&count).Error; err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "檢查權限名稱時出錯: " + err.Error()})
+			utils.Response(c, http.StatusInternalServerError, "error", "檢查權限名稱時出錯: "+err.Error(), nil)
 			return
 		}
 		if count > 0 {
-			c.JSON(http.StatusConflict, gin.H{"error": "權限名稱已存在"})
+			utils.Response(c, http.StatusConflict, "error", "權限名稱已存在", nil)
 			return
 		}
 	}
@@ -355,11 +355,11 @@ func (h *Handler) UpdatePermissionHandler(c *gin.Context) {
 		if err := h.DB.Model(&models.Permission{}).
 			Where("code = ? AND id != ?", req.Code, existingPermission.ID).
 			Count(&count).Error; err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "檢查權限碼時出錯: " + err.Error()})
+			utils.Response(c, http.StatusInternalServerError, "error", "檢查權限碼時出錯: "+err.Error(), nil)
 			return
 		}
 		if count > 0 {
-			c.JSON(http.StatusConflict, gin.H{"error": "權限碼已存在"})
+			utils.Response(c,http.StatusConflict, "error", "權限碼已存在", nil)
 			return
 		}
 	}
@@ -377,13 +377,13 @@ func (h *Handler) UpdatePermissionHandler(c *gin.Context) {
 	}
 
 	if err := h.DB.Model(&existingPermission).Updates(updates).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "更新權限時出錯: " + err.Error()})
+		utils.Response(c, http.StatusInternalServerError, "error", "更新權限時出錯", nil)
 		return
 	}
 
 	// 重新獲取更新後的權限信息
 	if err := h.DB.First(&existingPermission, permissionID).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "獲取更新後的權限信息時出錯: " + err.Error()})
+		utils.Response(c, http.StatusInternalServerError, "error", "獲取更新後的權限信息時出錯", nil)
 		return
 	}
 
@@ -409,16 +409,17 @@ type LoginRequest struct {
 func (h *Handler) LoginHandler(c *gin.Context) {
 	var req LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		utils.Response(c, http.StatusBadRequest, "error", "無效的請求體", nil)
 		return
 	}
 
 	authService := services.NewAuthService(h.DB, h.Cfg.JWTSecret)
 	token, err := authService.Login(req.Username, req.Password)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		utils.Response(c, http.StatusUnauthorized, "error", "登錄失敗", nil)
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"token": token})
+	c.Header("Authorization", token)
+	utils.Response(c, http.StatusOK, "success", "登錄成功", nil)
 }
