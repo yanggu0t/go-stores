@@ -3,6 +3,7 @@ package config
 import (
 	"encoding/json"
 	"log"
+	"os"
 	"path/filepath"
 	"runtime"
 
@@ -32,9 +33,21 @@ func loadTranslationFile(filename string) {
 	_, err := bundle.LoadMessageFile(path)
 	if err != nil {
 		log.Printf("加載翻譯文件 %s 時出錯: %v\n", filename, err)
+		// 列出 locales 目錄內容以進行調試
+		entries, _ := os.ReadDir(filepath.Join(rootDir, "locales"))
+		log.Printf("locales 目錄內容: %v", getFileNames(entries))
 	} else {
-		log.Printf("成功加載翻譯文件: %s\n", path)
+		log.Printf("成功加載翻譯文件: %s\n", filename)
 	}
+}
+
+// 輔助函數：獲取目錄條目的文件名列表
+func getFileNames(entries []os.DirEntry) []string {
+	names := make([]string, len(entries))
+	for i, entry := range entries {
+		names[i] = entry.Name()
+	}
+	return names
 }
 
 func Translate(msgID string, language string, params map[string]interface{}) string {

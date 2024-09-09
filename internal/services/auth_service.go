@@ -39,7 +39,7 @@ func (s *AuthService) Login(username, password string) (string, error) {
 		return "", errors.New(ErrPasswordIncorrect)
 	}
 
-	expirationTime := time.Now().Add(1 * time.Minute)
+	expirationTime := time.Now().Add(24 * time.Hour)
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"user_id": user.UserID,
