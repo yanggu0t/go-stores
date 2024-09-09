@@ -26,6 +26,9 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	}
 	r.Use(cors.New(corsConfig))
 
+	// i18n Middleware
+	r.Use(middleware.LanguageMiddleware())
+
 	// 創建服務實例
 	authService := services.NewAuthService(db, cfg.JWTSecret)
 	handler := handlers.NewHandler(db, cfg)

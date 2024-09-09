@@ -13,7 +13,7 @@ func AuthMiddleware(authService *services.AuthService, requiredRole ...string) g
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
-			utils.Response(c, http.StatusUnauthorized, "error", "未提供授權令牌", nil)
+			utils.Response(c, http.StatusUnauthorized, "error", "error_no_auth_token", nil)
 			c.Abort()
 			return
 		}
@@ -22,25 +22,22 @@ func AuthMiddleware(authService *services.AuthService, requiredRole ...string) g
 
 		claims, expTime, err := authService.ValidateToken(tokenString)
 		if err != nil {
-			if err.Error() == "令牌已過期" {
-				utils.Response(c, http.StatusUnauthorized, "error", "令牌已過期", nil)
-			} else {
-				utils.Response(c, http.StatusUnauthorized, "error", "無效的授權令牌", nil)
-			}
+			utils.Response(c, http.StatusUnauthorized, "error", "error_invalid_auth_token", nil)
+
 			c.Abort()
 			return
 		}
 
 		userID, ok := claims["user_id"].(string)
 		if !ok {
-			utils.Response(c, http.StatusUnauthorized, "error", "無效的用戶 ID", nil)
+			utils.Response(c, http.StatusUnauthorized, "error", "error_invalid_user_id", nil)
 			c.Abort()
 			return
 		}
 
 		user, err := authService.GetUserByID(userID)
 		if err != nil {
-			utils.Response(c, http.StatusUnauthorized, "error", "無效的用戶", nil)
+			utils.Response(c, http.StatusUnauthorized, "error", "error_invalid_user_id", nil)
 			c.Abort()
 			return
 		}
@@ -55,7 +52,7 @@ func AuthMiddleware(authService *services.AuthService, requiredRole ...string) g
 			}
 
 			if !hasRole {
-				utils.Response(c, http.StatusForbidden, "error", "未授權訪問", nil)
+				utils.Response(c, http.StatusForbidden, "error", "error_unauthorized_access", nil)
 				c.Abort()
 				return
 			}

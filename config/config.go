@@ -48,7 +48,7 @@ func Load() *Config {
 	return &Config{
 		DatabaseURL: connStr,
 		ServerPort:  getEnv("SERVER_PORT", "8080"),
-		JWTSecret:   getEnv("JWT_SECRET", ""), // 新增這行
+		JWTSecret:   getEnv("JWT_SECRET", ""),
 	}
 }
 
