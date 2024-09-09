@@ -6,36 +6,41 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/yanggu0t/go-rdbms-practice/internal/services"
+	"github.com/yanggu0t/go-rdbms-practice/internal/utils"
 )
 
 func AuthMiddleware(authService *services.AuthService, requiredRole ...string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "未提供授權令牌"})
+			utils.Response(c, http.StatusUnauthorized, "error", "未提供授權令牌", nil)
 			c.Abort()
 			return
 		}
 
 		tokenString := strings.TrimPrefix(authHeader, "Bearer ")
 
-		claims, err := authService.ValidateToken(tokenString)
+		claims, expTime, err := authService.ValidateToken(tokenString)
 		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "無效的授權令牌"})
+			if err.Error() == "令牌已過期" {
+				utils.Response(c, http.StatusUnauthorized, "error", "令牌已過期", nil)
+			} else {
+				utils.Response(c, http.StatusUnauthorized, "error", "無效的授權令牌", nil)
+			}
 			c.Abort()
 			return
 		}
 
 		userID, ok := claims["user_id"].(string)
 		if !ok {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "無效的用戶 ID"})
+			utils.Response(c, http.StatusUnauthorized, "error", "無效的用戶 ID", nil)
 			c.Abort()
 			return
 		}
 
 		user, err := authService.GetUserByID(userID)
 		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "無效的用戶"})
+			utils.Response(c, http.StatusUnauthorized, "error", "無效的用戶", nil)
 			c.Abort()
 			return
 		}
@@ -50,13 +55,14 @@ func AuthMiddleware(authService *services.AuthService, requiredRole ...string) g
 			}
 
 			if !hasRole {
-				c.JSON(http.StatusForbidden, gin.H{"error": "未授權訪問"})
+				utils.Response(c, http.StatusForbidden, "error", "未授權訪問", nil)
 				c.Abort()
 				return
 			}
 		}
 
 		c.Set("user", user)
+		c.Set("expTime", expTime)
 		c.Next()
 	}
 }

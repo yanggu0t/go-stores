@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -359,7 +360,7 @@ func (h *Handler) UpdatePermissionHandler(c *gin.Context) {
 			return
 		}
 		if count > 0 {
-			utils.Response(c,http.StatusConflict, "error", "權限碼已存在", nil)
+			utils.Response(c, http.StatusConflict, "error", "權限碼已存在", nil)
 			return
 		}
 	}
@@ -407,6 +408,18 @@ type LoginRequest struct {
 }
 
 func (h *Handler) LoginHandler(c *gin.Context) {
+	// 檢查請求頭中是否存在有效的 token
+	authHeader := c.GetHeader("Authorization")
+	if authHeader != "" {
+		tokenString := strings.TrimPrefix(authHeader, "Bearer ")
+		authService := services.NewAuthService(h.DB, h.Cfg.JWTSecret)
+		_, expTime, err := authService.ValidateToken(tokenString)
+		if err == nil {
+			utils.Response(c, http.StatusBadRequest, "error", "已登入，請勿重複登入", expTime)
+			return
+		}
+	}
+
 	var req LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		utils.Response(c, http.StatusBadRequest, "error", "無效的請求體", nil)
@@ -422,4 +435,20 @@ func (h *Handler) LoginHandler(c *gin.Context) {
 
 	c.Header("Authorization", token)
 	utils.Response(c, http.StatusOK, "success", "登錄成功", nil)
+}
+
+func (h *Handler) ValidateHandler(c *gin.Context) {
+	expTime, exists := c.Get("expTime")
+	if !exists {
+		utils.Response(c, http.StatusUnauthorized, "error", "無效的令牌", nil)
+		return
+	}
+
+	expTime, ok := expTime.(int64)
+	if !ok {
+		utils.Response(c, http.StatusInternalServerError, "error", "無法獲取過期時間", nil)
+		return
+	}
+
+	utils.Response(c, http.StatusOK, "success", "有效的令牌", expTime)
 }

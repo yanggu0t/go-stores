@@ -48,19 +48,23 @@ func (s *AuthService) Login(username, password string) (string, error) {
 	return tokenString, nil
 }
 
-func (s *AuthService) ValidateToken(tokenString string) (jwt.MapClaims, error) {
+func (s *AuthService) ValidateToken(tokenString string) (jwt.MapClaims, int64, error) {
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 		return s.Secret, nil
 	})
 	if err != nil {
-		return nil, err
+		return nil, -1, err
 	}
 
 	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
-		return claims, nil
+		if exp, ok := claims["exp"].(float64); ok {
+			expTimestamp := int64(exp)
+			return claims, expTimestamp, nil
+		}
+		return claims, -1, errors.New("無法獲取過期時間")
 	}
 
-	return nil, errors.New("無效的令牌")
+	return nil, time.Now().Unix(), errors.New("無效的令牌")
 }
 
 func (s *AuthService) GetUserByID(userID string) (*models.User, error) {

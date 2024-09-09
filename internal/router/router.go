@@ -37,6 +37,8 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	authorized := r.Group("/")
 	authorized.Use(middleware.AuthMiddleware(authService))
 
+	authorized.GET("/verify", handler.ValidateHandler)
+
 	// 設置需要管理員權限的路由
 	admin := authorized.Group("/admin")
 	admin.Use(middleware.AuthMiddleware(authService, "admin"))
