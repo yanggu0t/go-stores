@@ -20,23 +20,14 @@ func AuthMiddleware(authService *services.AuthService, requiredRole ...string) g
 
 		tokenString := strings.TrimPrefix(authHeader, "Bearer ")
 
-		claims, expTime, err := authService.ValidateToken(tokenString)
+		user, expTime, err := authService.ValidateToken(tokenString)
 		if err != nil {
 			utils.Response(c, http.StatusUnauthorized, "error", "error_invalid_auth_token", nil)
-
 			c.Abort()
 			return
 		}
 
-		userID, ok := claims["user_id"].(string)
-		if !ok {
-			utils.Response(c, http.StatusUnauthorized, "error", "error_invalid_user_id", nil)
-			c.Abort()
-			return
-		}
-
-		user, err := authService.GetUserByID(userID)
-		if err != nil {
+		if user == nil {
 			utils.Response(c, http.StatusUnauthorized, "error", "error_invalid_user_id", nil)
 			c.Abort()
 			return

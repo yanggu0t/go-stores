@@ -29,32 +29,41 @@ func NewAuthService(db *gorm.DB, secret string) *AuthService {
 	}
 }
 
-func (s *AuthService) Login(username, password string) (string, error) {
+func (s *AuthService) Login(username, password string) (string, *models.User, error) {
 	var user models.User
-	if err := s.DB.Where("username = ?", username).First(&user).Error; err != nil {
-		return "", errors.New(ErrUserNotFound)
+	if err := s.DB.Preload("Roles").Where("username = ?", username).First(&user).Error; err != nil {
+		return "", nil, errors.New(ErrUserNotFound)
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password)); err != nil {
-		return "", errors.New(ErrPasswordIncorrect)
+		return "", nil, errors.New(ErrPasswordIncorrect)
 	}
 
 	expirationTime := time.Now().Add(24 * time.Hour)
+	expirationUnix := expirationTime.Unix()
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"user_id": user.UserID,
-		"exp":     expirationTime.Unix(),
+		"exp":     expirationUnix,
 	})
 
 	tokenString, err := token.SignedString(s.Secret)
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
 
-	return tokenString, nil
+	// 設置用戶的過期時間
+	user.Expires = expirationUnix
+
+	// 更新數據庫中的用戶資料
+	if err := s.DB.Save(&user).Error; err != nil {
+		return "", nil, err
+	}
+
+	return tokenString, &user, nil
 }
 
-func (s *AuthService) ValidateToken(tokenString string) (jwt.MapClaims, int64, error) {
+func (s *AuthService) ValidateToken(tokenString string) (*models.User, int64, error) {
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 		return s.Secret, nil
 	})
@@ -63,14 +72,31 @@ func (s *AuthService) ValidateToken(tokenString string) (jwt.MapClaims, int64, e
 	}
 
 	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
-		if exp, ok := claims["exp"].(float64); ok {
-			expTimestamp := int64(exp)
-			return claims, expTimestamp, nil
+		userID, ok := claims["user_id"].(string)
+		if !ok {
+			return nil, -1, errors.New("error_invalid_user_id")
 		}
-		return claims, -1, errors.New("error_get_expiration_time")
+
+		exp, ok := claims["exp"].(float64)
+		if !ok {
+			return nil, -1, errors.New("error_get_expiration_time")
+		}
+
+		expTimestamp := int64(exp)
+
+		// 查找用戶資料
+		user, err := s.GetUserByID(userID)
+		if err != nil {
+			return nil, -1, err
+		}
+
+		// 將過期時間插入到用戶資料中
+		user.Expires = expTimestamp
+
+		return user, expTimestamp, nil
 	}
 
-	return nil, time.Now().Unix(), errors.New("error_invalid_token")
+	return nil, -1, errors.New("error_invalid_token")
 }
 
 func (s *AuthService) GetUserByID(userID string) (*models.User, error) {

@@ -427,7 +427,7 @@ func (h *Handler) LoginHandler(c *gin.Context) {
 	}
 
 	authService := services.NewAuthService(h.DB, h.Cfg.JWTSecret)
-	token, err := authService.Login(req.Username, req.Password)
+	token, user, err := authService.Login(req.Username, req.Password)
 	if err != nil {
 		switch err.Error() {
 		case services.ErrUserNotFound:
@@ -441,21 +441,37 @@ func (h *Handler) LoginHandler(c *gin.Context) {
 	}
 
 	c.Header("Authorization", token)
-	utils.Response(c, http.StatusOK, "success", "success_login", nil)
+
+	// 準備用戶資料
+	userData := gin.H{
+		"userId":   user.UserID,
+		"username": user.Username,
+		"email":    user.Email,
+		"roles":    user.Roles,
+		"expTime":  user.Expires,
+	}
+
+	utils.Response(c, http.StatusOK, "success", "success_login", userData)
 }
 
 func (h *Handler) ValidateHandler(c *gin.Context) {
-	expTime, exists := c.Get("expTime")
+	user, exists := c.Get("user")
 	if !exists {
 		utils.Response(c, http.StatusUnauthorized, "error", "error_invalid_token", nil)
 		return
 	}
 
-	expTime, ok := expTime.(int64)
-	if !ok {
-		utils.Response(c, http.StatusInternalServerError, "error", "error_get_expiration_time", nil)
-		return
+	userModel := user.(*models.User)
+	expTime := c.GetInt64("expTime")
+
+	// 準備用戶資料
+	userData := gin.H{
+		"userId":   userModel.UserID,
+		"username": userModel.Username,
+		"email":    userModel.Email,
+		"roles":    userModel.Roles,
+		"expTime":  expTime,
 	}
 
-	utils.Response(c, http.StatusOK, "success", "success_valid_token", expTime)
+	utils.Response(c, http.StatusOK, "success", "success_valid_token", userData)
 }

@@ -26,6 +26,7 @@ type User struct {
 	Email    string `gorm:"unique;not null"`
 	Password string `gorm:"not null"`
 	Roles    []Role `gorm:"many2many:user_roles;"`
+	Expires  int64  `gorm:"not null;default:0"`
 }
 
 // SetPassword 加密並設置用戶密碼
