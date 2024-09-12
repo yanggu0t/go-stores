@@ -4,6 +4,7 @@ import (
 	"log"
 
 	"github.com/yanggu0t/go-rdbms-practice/config"
+	"github.com/yanggu0t/go-rdbms-practice/internal/models"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -20,4 +21,21 @@ func InitDB(cfg *config.Config) *gorm.DB {
 
 	log.Println("數據庫初始化成功")
 	return db
+}
+
+func AutoMigrate(db *gorm.DB) {
+	log.Println("Running database migrations...")
+
+	err := db.AutoMigrate(
+		&models.User{},
+		&models.Project{},
+		&models.Role{},
+		&models.Permission{},
+		&models.ProjectUserRole{},
+	)
+	if err != nil {
+		log.Fatalf("Error during database migration: %v", err)
+	}
+
+	log.Println("Database migration completed successfully")
 }

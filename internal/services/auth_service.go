@@ -29,9 +29,9 @@ func NewAuthService(db *gorm.DB, secret string) *AuthService {
 	}
 }
 
-func (s *AuthService) Login(username, password string) (string, *models.User, error) {
+func (s *AuthService) Login(usernameOrEmail, password string) (string, *models.User, error) {
 	var user models.User
-	if err := s.DB.Preload("Roles").Where("username = ?", username).First(&user).Error; err != nil {
+	if err := s.DB.Preload("Roles").Where("username = ? OR email = ?", usernameOrEmail, usernameOrEmail).First(&user).Error; err != nil {
 		return "", nil, errors.New(ErrUserNotFound)
 	}
 

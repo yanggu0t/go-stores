@@ -30,32 +30,68 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	r.Use(middleware.LanguageMiddleware())
 
 	// 創建服務實例
+	userService := services.NewUserService(db)
 	authService := services.NewAuthService(db, cfg.JWTSecret)
-	handler := handlers.NewHandler(db, cfg)
+	// projectService := services.NewProjectService(db)
 
-	// 設置不需要特殊權限的路由
-	r.POST("/login", handler.LoginHandler)
+	// 創建處理器實例
+	userHandler := handlers.NewUserHandler(userService)
+	authHandler := handlers.NewAuthHandler(authService)
+	// projectHandler := handlers.NewProjectHandler(projectService)
 
-	// 使用 AuthMiddleware
-	authorized := r.Group("/")
-	authorized.Use(middleware.AuthMiddleware(authService))
+	api := r.Group("/")
+	{
+		// 公開路由
+		api.POST("/users", userHandler.CreateUser)
+		api.POST("/login", authHandler.Login)
 
-	authorized.GET("/verify", handler.ValidateHandler)
+		// 需要認證的路由
+		authorized := api.Group("/")
+		authorized.Use(middleware.AuthMiddleware(authService))
+		// {
+		// 	// 專案相關路由
+		// 	projects := authorized.Group("/projects")
+		// 	{
+		// 		projects.GET("", projectHandler.GetAllProjects)
+		// 		projects.POST("", projectHandler.CreateProject)
+		// 		projects.GET("/:id", projectHandler.GetProject)
+		// 		projects.PUT("/:id", projectHandler.UpdateProject)
+		// 		projects.DELETE("/:id", projectHandler.DeleteProject)
 
-	// 設置需要管理員權限的路由
-	admin := authorized.Group("/admin")
-	admin.Use(middleware.AuthMiddleware(authService, "admin"))
+		// 		// 專案內的用戶管理
+		// 		projects.GET("/:id/users", projectHandler.GetProjectUsers)
+		// 		projects.POST("/:id/users", projectHandler.AddUserToProject)
+		// 		projects.DELETE("/:id/users/:userId", projectHandler.RemoveUserFromProject)
 
-	// 設置需要管理員權限的路由
-	admin.GET("/users", handler.GetAllUsersHandler)
-	admin.GET("/roles", handler.GetAllRolesHandler)
-	admin.GET("/permissions", handler.GetAllPermissionsHandler)
-	admin.POST("/roles", handler.CreateRoleHandler)
-	admin.POST("/users", handler.CreateUserHandler)
-	admin.POST("/permissions", handler.CreatePermissionHandler)
-	admin.PUT("/roles/:id", handler.UpdateRoleHandler)
-	admin.PUT("/users/:id", handler.UpdateUserHandler)
-	admin.PUT("/permissions/:id", handler.UpdatePermissionHandler)
+		// 		// 專案內的角色管理
+		// 		projects.GET("/:id/roles", projectHandler.GetProjectRoles)
+		// 		projects.POST("/:id/roles", projectHandler.CreateProjectRole)
+		// 		projects.PUT("/:id/roles/:roleId", projectHandler.UpdateProjectRole)
+		// 		projects.DELETE("/:id/roles/:roleId", projectHandler.DeleteProjectRole)
+
+		// 		// 專案內的權限管理
+		// 		projects.GET("/:id/permissions", projectHandler.GetProjectPermissions)
+		// 		projects.POST("/:id/permissions", projectHandler.CreateProjectPermission)
+		// 		projects.PUT("/:id/permissions/:permissionId", projectHandler.UpdateProjectPermission)
+		// 		projects.DELETE("/:id/permissions/:permissionId", projectHandler.DeleteProjectPermission)
+		// 	}
+
+		// 	// 用戶管理路由
+		// 	users := authorized.Group("/users")
+		// 	{
+		// 		users.GET("/:id", userHandler.GetUser)
+		// 		users.PUT("/:id", userHandler.UpdateUser)
+		// 		users.DELETE("/:id", userHandler.DeleteUser)
+		// 	}
+
+		// 	// 認證相關路由
+		// 	auth := authorized.Group("/auth")
+		// 	{
+		// 		auth.POST("/logout", authHandler.Logout)
+		// 		auth.POST("/refresh-token", authHandler.RefreshToken)
+		// 	}
+		// }
+	}
 
 	return r
 }
