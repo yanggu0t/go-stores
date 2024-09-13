@@ -26,16 +26,34 @@ func InitDB(cfg *config.Config) *gorm.DB {
 func AutoMigrate(db *gorm.DB) {
 	log.Println("Running database migrations...")
 
-	err := db.AutoMigrate(
-		&models.User{},
-		&models.Project{},
-		&models.Role{},
-		&models.Permission{},
-		&models.ProjectUserRole{},
-	)
-	if err != nil {
-		log.Fatalf("Error during database migration: %v", err)
+	// Disable foreign key checks during migration
+	db.Exec("SET CONSTRAINTS ALL DEFERRED;")
+
+	// Define the order of migrations
+	migrations := []struct {
+		Model interface{}
+		Name  string
+	}{
+		{&models.User{}, "User"},
+		{&models.Permission{}, "Permission"},
+		{&models.Role{}, "Role"},
+		{&models.Project{}, "Project"},
+		{&models.UserSession{}, "UserSession"},
+		{&models.ProjectUserRole{}, "ProjectUserRole"},
+		{&models.ProjectPermission{}, "ProjectPermission"},
+		{&models.RolePermission{}, "RolePermission"},
 	}
+
+	// Perform migrations in order
+	for _, migration := range migrations {
+		log.Printf("Migrating %s...", migration.Name)
+		if err := db.AutoMigrate(migration.Model); err != nil {
+			log.Fatalf("Error migrating %s: %v", migration.Name, err)
+		}
+	}
+
+	// Re-enable foreign key checks
+	db.Exec("SET CONSTRAINTS ALL IMMEDIATE;")
 
 	log.Println("Database migration completed successfully")
 }

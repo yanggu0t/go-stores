@@ -1,4 +1,3 @@
-// Package services
 package services
 
 import (
@@ -8,7 +7,6 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/yanggu0t/go-rdbms-practice/internal/models"
-	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
 
@@ -29,82 +27,122 @@ func NewAuthService(db *gorm.DB, secret string) *AuthService {
 	}
 }
 
-func (s *AuthService) Login(usernameOrEmail, password string) (string, *models.User, error) {
+func (s *AuthService) Login(account, password string) (string, *models.User, error) {
 	var user models.User
-	if err := s.DB.Preload("Roles").Where("username = ? OR email = ?", usernameOrEmail, usernameOrEmail).First(&user).Error; err != nil {
+	if err := s.DB.Where("username = ? OR email = ?", account, account).First(&user).Error; err != nil {
 		return "", nil, errors.New(ErrUserNotFound)
 	}
 
-	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password)); err != nil {
+	if !user.CheckPassword(password) {
 		return "", nil, errors.New(ErrPasswordIncorrect)
 	}
 
-	expirationTime := time.Now().Add(24 * time.Hour)
-	expirationUnix := expirationTime.Unix()
-
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"user_id": user.UserID,
-		"exp":     expirationUnix,
-	})
-
-	tokenString, err := token.SignedString(s.Secret)
+	// 生成新的 token
+	token, expirationUnix, err := s.GenerateToken(user.UserID)
 	if err != nil {
 		return "", nil, err
 	}
 
-	// 設置用戶的過期時間
-	user.Expires = expirationUnix
-
-	// 更新數據庫中的用戶資料
-	if err := s.DB.Save(&user).Error; err != nil {
+	// 創建或更新 UserSession
+	session := models.UserSession{
+		UserID:  user.UserID,
+		Token:   token,
+		Expires: expirationUnix,
+	}
+	if err := s.DB.Save(&session).Error; err != nil {
 		return "", nil, err
 	}
 
-	return tokenString, &user, nil
+	return token, &user, nil
 }
 
-func (s *AuthService) ValidateToken(tokenString string) (*models.User, int64, error) {
+func (s *AuthService) Logout(tokenString string) error {
+	session, err := s.ValidateToken(tokenString)
+	if err != nil {
+		return err
+	}
+
+	// 刪除 session
+	if err := s.DB.Delete(&session).Error; err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *AuthService) ValidateToken(tokenString string) (*models.UserSession, error) {
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 		return s.Secret, nil
 	})
 	if err != nil {
-		return nil, -1, err
+		return nil, err
 	}
 
 	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
-		userID, ok := claims["user_id"].(string)
+		_, ok := claims["user_id"].(string)
 		if !ok {
-			return nil, -1, errors.New("error_invalid_user_id")
+			return nil, errors.New("error_invalid_user_id")
 		}
 
-		exp, ok := claims["exp"].(float64)
-		if !ok {
-			return nil, -1, errors.New("error_get_expiration_time")
+		// 查找 session
+		var session models.UserSession
+		if err := s.DB.Where("token = ?", tokenString).Preload("User").First(&session).Error; err != nil {
+			return nil, err
 		}
 
-		expTimestamp := int64(exp)
-
-		// 查找用戶資料
-		user, err := s.GetUserByID(userID)
-		if err != nil {
-			return nil, -1, err
+		// 檢查 token 是否過期
+		if time.Now().Unix() > session.Expires {
+			return nil, errors.New("error_token_expired")
 		}
 
-		// 將過期時間插入到用戶資料中
-		user.Expires = expTimestamp
-
-		return user, expTimestamp, nil
+		return &session, nil
 	}
 
-	return nil, -1, errors.New("error_invalid_token")
+	return nil, errors.New("error_invalid_token")
 }
 
 func (s *AuthService) GetUserByID(userID string) (*models.User, error) {
 	var user models.User
-	if err := s.DB.Preload("Roles").Where("user_id = ?", userID).First(&user).Error; err != nil {
+	if err := s.DB.Where("user_id = ?", userID).First(&user).Error; err != nil {
 		return nil, err
 	}
 
 	fmt.Printf("用戶: %+v\n", user)
 	return &user, nil
+}
+
+func (s *AuthService) GenerateToken(userID string) (string, int64, error) {
+	expirationTime := time.Now().Add(24 * time.Hour)
+	expirationUnix := expirationTime.Unix()
+
+	claims := jwt.MapClaims{
+		"user_id": userID,
+		"exp":     expirationUnix,
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+
+	tokenString, err := token.SignedString(s.Secret)
+	if err != nil {
+		return "", 0, err
+	}
+
+	return tokenString, expirationUnix, nil
+}
+
+func (s *AuthService) CheckProjectPermission(userID uint, projectID string, requiredPermission string) (bool, error) {
+	var projectUserRoles []models.ProjectUserRole
+	if err := s.DB.Where("user_id = ? AND project_id = ?", userID, projectID).Preload("Role").Preload("Role.Permissions").Find(&projectUserRoles).Error; err != nil {
+		return false, err
+	}
+
+	for _, pur := range projectUserRoles {
+		for _, permission := range pur.Role.Permissions {
+			if permission.Code == requiredPermission {
+				return true, nil
+			}
+		}
+	}
+
+	return false, nil
 }

@@ -11,9 +11,10 @@ import (
 )
 
 type Config struct {
-	DatabaseURL string
-	ServerPort  string
-	JWTSecret   string
+	DatabaseURL   string
+	ServerPort    string
+	JWTSecret     string
+	EncryptionKey string
 }
 
 func Load() *Config {
@@ -46,9 +47,10 @@ func Load() *Config {
 	connStr := "postgres://" + u.User.Username() + ":" + password + "@" + u.Host + u.Path
 
 	return &Config{
-		DatabaseURL: connStr,
-		ServerPort:  getEnv("SERVER_PORT", "8080"),
-		JWTSecret:   getEnv("JWT_SECRET", ""),
+		DatabaseURL:   connStr,
+		ServerPort:    getEnv("SERVER_PORT", "8080"),
+		JWTSecret:     getEnv("JWT_SECRET", ""),
+		EncryptionKey: getEnv("ENCRYPTION_KEY", ""),
 	}
 }
 

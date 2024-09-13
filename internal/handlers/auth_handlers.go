@@ -27,9 +27,9 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	authHeader := c.GetHeader("Authorization")
 	if authHeader != "" {
 		tokenString := strings.TrimPrefix(authHeader, "Bearer ")
-		_, expTime, err := h.AuthService.ValidateToken(tokenString)
+		session, err := h.AuthService.ValidateToken(tokenString)
 		if err == nil {
-			utils.Response(c, http.StatusBadRequest, "error", "error_already_logged_in", expTime)
+			utils.Response(c, http.StatusBadRequest, "error", "error_already_logged_in", session.Expires)
 			return
 		}
 	}
@@ -60,9 +60,46 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		"userId":   user.UserID,
 		"username": user.Username,
 		"email":    user.Email,
-		"roles":    user.Roles,
-		"expTime":  user.Expires,
 	}
 
 	utils.Response(c, http.StatusOK, "success", "success_login", userData)
+}
+
+func (h *AuthHandler) Logout(c *gin.Context) {
+	authHeader := c.GetHeader("Authorization")
+	if authHeader == "" {
+		utils.Response(c, http.StatusBadRequest, "error", "error_no_token_provided", nil)
+		return
+	}
+
+	tokenString := strings.TrimPrefix(authHeader, "Bearer ")
+	err := h.AuthService.Logout(tokenString)
+	if err != nil {
+		utils.Response(c, http.StatusInternalServerError, "error", "error_logout_failed", nil)
+		return
+	}
+
+	utils.Response(c, http.StatusOK, "success", "success_logout", nil)
+}
+
+func (h *AuthHandler) VerifyToken(c *gin.Context) {
+	authHeader := c.GetHeader("Authorization")
+	if authHeader == "" {
+		utils.Response(c, http.StatusBadRequest, "error", "error_no_token_provided", nil)
+		return
+	}
+
+	tokenString := strings.TrimPrefix(authHeader, "Bearer ")
+	session, err := h.AuthService.ValidateToken(tokenString)
+	if err != nil {
+		utils.Response(c, http.StatusUnauthorized, "error", "error_invalid_token", nil)
+		return
+	}
+
+	userData := gin.H{
+		"userId":  session.UserID,
+		"expTime": session.Expires,
+	}
+
+	utils.Response(c, http.StatusOK, "success", "success_token_verified", userData)
 }

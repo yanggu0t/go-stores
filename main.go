@@ -18,6 +18,9 @@ func main() {
 	// 初始化數據庫
 	db := database.InitDB(cfg)
 
+	// 自動建立資料庫表
+	database.AutoMigrate(db)
+
 	// 設置路由
 	r := router.SetupRouter(db, cfg)
 
